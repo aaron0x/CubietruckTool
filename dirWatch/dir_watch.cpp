@@ -11,20 +11,15 @@
 
 using namespace std;
 
-bool run = true;
-
 // set values of -d/-f to dir/command.
-bool   parseParameters(int argc, char** const argv, char** dir, char** command);
+bool parseParameters(int argc, char** const argv, char** dir, char** command);
 
-void   subscribeSignals();
+void subscribeSignals();
 
-// exit program graceful when catching a signal.
-void   quitMonitor(int sigNum);
-
-int    initializeInotify(const char* path);
+int initializeInotify(const char* path);
 
 // start to watch dir infinitely. excute command when dir changing.
-void   keepMonitorDir(int fd, const char* command);
+void keepMonitorDir(int fd, const char* command);
 
 string&& toStr(int number);
 
@@ -79,15 +74,13 @@ bool parseParameters(int argc, char** const argv, char** dir, char** command) {
    return true;
 }
 
+// Just catch signal.
 void subscribeSignals() {
-   signal(SIGINT,  quitMonitor);
-   signal(SIGHUP,  quitMonitor);
-   signal(SIGTERM, quitMonitor);
-   signal(SIGKILL, quitMonitor);   
-}
-
-void quitMonitor(int sigNum) {
-   run = false;
+   auto emptyHandle = [](int sigNum) {};
+   signal(SIGINT,  emptyHandle);
+   signal(SIGHUP,  emptyHandle);
+   signal(SIGTERM, emptyHandle);
+   signal(SIGKILL, emptyHandle);   
 }
 
 int initializeInotify(const char* path) {
@@ -104,20 +97,20 @@ int initializeInotify(const char* path) {
    return fd;
 }
 
+// Quit when get signal.
 void keepMonitorDir(int fd, const char* command) {
-   while (run) {
+    while (true) {
       char buf[sizeof(struct inotify_event) + NAME_MAX + 1] = "";
-      int readRc = read(fd, buf, sizeof(buf));
-      if (readRc == EIO) {
-         throw runtime_error("read inotify fd error");
-      }
 
-      // only excute command when real event happened.
-      if (readRc > 0) {
+      if (read(fd, buf, sizeof(buf)) > 0) {
          int commandRc = system(command);
          if (commandRc == -1 || WEXITSTATUS(commandRc) != 0) {
             throw runtime_error("command failed, return " + toStr(WEXITSTATUS(commandRc)));
-         }   
+         }          
+      } else if (errno == EINTR) {
+         break;
+      } else {
+         throw runtime_error("read error, errno = " + toStr(errno));
       }
    }
 }
