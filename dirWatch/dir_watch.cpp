@@ -11,6 +11,8 @@
 
 using namespace std;
 
+bool volatile run = true;
+
 // set values of -d/-f to dir/command.
 bool parseParameters(int argc, char** const argv, char** path, char** command, bool* inDaemon);
 
@@ -85,11 +87,11 @@ bool parseParameters(int argc, char** const argv, char** path, char** command, b
 
 // Just catch signal.
 void subscribeSignals() {
-   auto emptyHandle = [](int sigNum) {};
-   signal(SIGINT,  emptyHandle);
-   signal(SIGHUP,  emptyHandle);
-   signal(SIGTERM, emptyHandle);
-   signal(SIGKILL, emptyHandle);   
+   auto handle = [](int sigNum) { run = false; };
+   signal(SIGINT,  handle);
+   signal(SIGHUP,  handle);
+   signal(SIGTERM, handle);
+   signal(SIGKILL, handle);   
 }
 
 int initializeInotify(const char* path) {
@@ -106,9 +108,8 @@ int initializeInotify(const char* path) {
    return fd;
 }
 
-// Quit when get signal.
 void keepMonitorDir(int fd, const char* command) {
-    while (true) {
+    while (run) {
       char buf[sizeof(struct inotify_event) + NAME_MAX + 1] = "";
 
       if (read(fd, buf, sizeof(buf)) > 0) {
@@ -116,9 +117,7 @@ void keepMonitorDir(int fd, const char* command) {
          if (commandRc == -1 || WEXITSTATUS(commandRc) != 0) {
             throw runtime_error("command failed, return " + toStr(WEXITSTATUS(commandRc)));
          }          
-      } else if (errno == EINTR) {
-         break;
-      } else {
+      } else if (errno != EINTR) {
          throw runtime_error("read error, errno = " + toStr(errno));
       }
    }
