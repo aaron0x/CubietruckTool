@@ -12,7 +12,7 @@
 using namespace std;
 
 // set values of -d/-f to dir/command.
-bool parseParameters(int argc, char** const argv, char** dir, char** command);
+bool parseParameters(int argc, char** const argv, char** path, char** command, bool* inDaemon);
 
 void subscribeSignals();
 
@@ -24,17 +24,21 @@ void keepMonitorDir(int fd, const char* command);
 string&& toStr(int number);
 
 int main(int argc, char** argv) {
-   char* dir     = NULL;
-   char* command = NULL;
+   char* path     = NULL;
+   char* command  = NULL;
+   bool  inDaemon = false;
 
-   if (!parseParameters(argc, argv, &dir, &command)) {
+   if (!parseParameters(argc, argv, &path, &command, &inDaemon)) {
       cerr << "Usage: program -d dir_path -c command_for_dir_change\n";
       return EXIT_FAILURE;
    }
 
    try {
-      int fd = initializeInotify(dir);
+      int fd = initializeInotify(path);
       subscribeSignals();
+      if (inDaemon) {
+         daemon(0, 0);
+      }
       keepMonitorDir(fd, command);
       close(fd);
    } catch (const exception& e) {
@@ -45,15 +49,19 @@ int main(int argc, char** argv) {
    return EXIT_SUCCESS;
 }
 
-bool parseParameters(int argc, char** const argv, char** dir, char** command) {
+bool parseParameters(int argc, char** const argv, char** path, char** command, bool* inDaemon) {
    int   o = -1;
-   char* d = NULL;
+   char* p = NULL;
    char* c = NULL;
+   bool  d = false;
 
-   while((o = getopt(argc, argv, "d:c:")) != -1) {
+   while((o = getopt(argc, argv, "dp:c:")) != -1) {
       switch(o) {
          case 'd':
-            d = optarg;
+            d = true;
+            break;
+         case 'p':
+            p = optarg;
             break;
          case 'c':
             c = optarg;
@@ -64,12 +72,13 @@ bool parseParameters(int argc, char** const argv, char** dir, char** command) {
       }
    }
 
-   if (!d || !c) {
+   if (!p || !c) {
       return false;
    }
 
-   *dir     = d;
-   *command = c;
+   *inDaemon = d;
+   *path     = p;
+   *command  = c;
 
    return true;
 }
