@@ -14,7 +14,7 @@ using namespace std;
 bool volatile run = true;
 
 // set values of -d/-f to dir/command.
-bool parseParameters(int argc, char** const argv, char** path, char** command, bool* inDaemon);
+bool parseParameters(int argc, char** const argv, char** dir, char** command);
 
 void subscribeSignals();
 
@@ -26,21 +26,17 @@ void keepMonitorDir(int fd, const char* command);
 string&& toStr(int number);
 
 int main(int argc, char** argv) {
-   char* path     = NULL;
-   char* command  = NULL;
-   bool  inDaemon = false;
+   char* dir     = NULL;
+   char* command = NULL;
 
-   if (!parseParameters(argc, argv, &path, &command, &inDaemon)) {
+   if (!parseParameters(argc, argv, &dir, &command)) {
       cerr << "Usage: program -d dir_path -c command_for_dir_change\n";
       return EXIT_FAILURE;
    }
 
    try {
-      int fd = initializeInotify(path);
+      int fd = initializeInotify(dir);
       subscribeSignals();
-      if (inDaemon) {
-         daemon(0, 0);
-      }
       keepMonitorDir(fd, command);
       close(fd);
    } catch (const exception& e) {
@@ -51,19 +47,15 @@ int main(int argc, char** argv) {
    return EXIT_SUCCESS;
 }
 
-bool parseParameters(int argc, char** const argv, char** path, char** command, bool* inDaemon) {
+bool parseParameters(int argc, char** const argv, char** dir, char** command) {
    int   o = -1;
-   char* p = NULL;
+   char* d = NULL;
    char* c = NULL;
-   bool  d = false;
 
-   while((o = getopt(argc, argv, "dp:c:")) != -1) {
+   while((o = getopt(argc, argv, "d:c:")) != -1) {
       switch(o) {
          case 'd':
-            d = true;
-            break;
-         case 'p':
-            p = optarg;
+            d = optarg;
             break;
          case 'c':
             c = optarg;
@@ -74,13 +66,12 @@ bool parseParameters(int argc, char** const argv, char** path, char** command, b
       }
    }
 
-   if (!p || !c) {
+   if (!d || !c) {
       return false;
    }
 
-   *inDaemon = d;
-   *path     = p;
-   *command  = c;
+   *dir     = d;
+   *command = c;
 
    return true;
 }
