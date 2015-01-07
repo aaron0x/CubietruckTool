@@ -23,7 +23,7 @@ int initializeInotify(const char* path);
 // start to watch dir infinitely. excute command when dir changing.
 void keepMonitorDir(int fd, const char* command);
 
-string&& toStr(int number);
+string toStr(int number);
 
 int main(int argc, char** argv) {
    char* dir     = NULL;
@@ -93,7 +93,7 @@ int initializeInotify(const char* path) {
 
    if (inotify_add_watch(fd, path, IN_MODIFY | IN_CREATE) == -1) {
       close(fd);
-      throw runtime_error(string("inotify_add_watch failed ") + path + " " + toStr(errno));
+      throw runtime_error(string("inotify_add_watch failed ") + path + ", errno = " + toStr(errno));
    }
 
    return fd;
@@ -114,8 +114,8 @@ void keepMonitorDir(int fd, const char* command) {
    }
 }
 
-string&& toStr(int number) {
+string toStr(int number) {
    stringstream ss;
    ss << number;
-   return move(ss.str());
+   return ss.str();
 }
