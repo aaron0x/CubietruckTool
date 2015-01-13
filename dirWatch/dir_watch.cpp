@@ -6,8 +6,9 @@
 #include <cstdlib>
 #include <stdexcept>
 #include <sstream>
-#include <errno.h>
+#include <cerrno>
 #include <unistd.h>
+#include <system_error>
 
 using namespace std;
 
@@ -23,8 +24,6 @@ int initializeInotify(const char* path);
 // start to watch dir infinitely. excute command when dir changing.
 void keepMonitorDir(int fd, const char* command);
 
-string toStr(int number);
-
 int main(int argc, char** argv) {
    char* dir     = NULL;
    char* command = NULL;
@@ -39,6 +38,10 @@ int main(int argc, char** argv) {
       subscribeSignals();
       keepMonitorDir(fd, command);
       close(fd);
+   } catch (const system_error& s) {
+      cerr << s.what() << endl;
+      cerr << s.code() << endl;
+    
    } catch (const exception& e) {
       cerr << e.what() << endl;
       return EXIT_FAILURE;  
@@ -88,12 +91,12 @@ void subscribeSignals() {
 int initializeInotify(const char* path) {
    int fd = inotify_init();
    if (fd == -1) {
-      throw runtime_error("inotify init failed: " + toStr(errno));
+      throw system_error(errno, system_category(), "inotify init failed");
    }
 
    if (inotify_add_watch(fd, path, IN_MODIFY | IN_CREATE) == -1) {
       close(fd);
-      throw runtime_error(string("inotify_add_watch failed ") + path + ", errno = " + toStr(errno));
+      throw system_error(errno, system_category(), "inotify_add_watch failed");
    }
 
    return fd;
@@ -104,18 +107,21 @@ void keepMonitorDir(int fd, const char* command) {
       char buf[sizeof(struct inotify_event) + NAME_MAX + 1] = "";
 
       if (read(fd, buf, sizeof(buf)) > 0) {
-         int commandRc = system(command);
-         if (commandRc == -1 || WEXITSTATUS(commandRc) != 0) {
-            throw runtime_error("command failed, return " + toStr(WEXITSTATUS(commandRc)));
+         int commandRC = system(command);
+         if (commandRC == -1) {
+            throw runtime_error("system return -1");
+         }
+
+         int realRC = WEXITSTATUS(commandRC);
+         if (realRC == 127) {
+            throw runtime_error(string("command error: ") + command);
+         }
+         if (realRC) {
+            throw system_error(WEXITSTATUS(realRC), generic_category(), "command faile");
          }          
       } else if (errno != EINTR) {
-         throw runtime_error("read error, errno = " + toStr(errno));
+         throw system_error(errno, system_category(), "read error");
       }
    }
 }
 
-string toStr(int number) {
-   stringstream ss;
-   ss << number;
-   return ss.str();
-}
