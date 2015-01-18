@@ -4,7 +4,7 @@
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
 NAME=dir_watcher
 DAEMON=/usr/bin/$NAME
-DAEMON_ARGS="-d /home/cubie/log -c /home/cubie/bin/turn_blue_led.sh on"
+DAEMON_ARGS="-d /home/cubie/log -c /home/cubie/Data/bin/turn_on_blue_led.sh"
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
 
